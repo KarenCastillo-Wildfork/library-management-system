@@ -1,0 +1,133 @@
+openapi: 3.0.3
+info:
+  title: Loan Service API (Service B)
+  description: >
+    Manages loans: registering a loan, returning it, and listing active/history
+    loans. Persists its own data and validates books against Service A before
+    creating a loan.
+  version: 1.0.0
+servers:
+  - url: /
+paths:
+  /health:
+    get:
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Service is up
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: UP }
+                  time: { type: string, format: date-time }
+  /loans:
+    post:
+      tags: [loans]
+      summary: Register a loan
+      description: >
+        Validates book existence/availability with Service A
+        (GET /internal/books/{id}/availability) before persisting the loan.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLoanRequest"
+      responses:
+        "201":
+          description: Loan created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Loan" }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "502": { $ref: "#/components/responses/Error" }
+  /loans/{id}/return:
+    post:
+      tags: [loans]
+      summary: Return a loan
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: Loan returned
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Loan" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /loans/active:
+    get:
+      tags: [loans]
+      summary: List a user's active loans
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: Active loans for the user
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Loan" }
+        "400": { $ref: "#/components/responses/Error" }
+  /loans/history:
+    get:
+      tags: [loans]
+      summary: List loan history
+      description: Omit userId to list every user's history (used by ADMIN callers via Service A).
+      parameters:
+        - name: userId
+          in: query
+          required: false
+          schema: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: Loan history
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Loan" }
+components:
+  schemas:
+    CreateLoanRequest:
+      type: object
+      required: [userId, bookId]
+      properties:
+        userId: { type: integer, format: int64 }
+        bookId: { type: integer, format: int64 }
+    Loan:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        userId: { type: integer, format: int64 }
+        bookId: { type: integer, format: int64 }
+        loanDate: { type: string, format: date-time }
+        dueDate: { type: string, format: date-time }
+        returnDate: { type: string, format: date-time, nullable: true }
+        status: { type: string, enum: [ACTIVE, RETURNED] }
+    ErrorResponse:
+      type: object
+      properties:
+        timestamp: { type: string, format: date-time }
+        status: { type: integer }
+        error: { type: string }
+        message: { type: string }
+        path: { type: string }
+  responses:
+    Error:
+      description: Error response
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
