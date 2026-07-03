@@ -1,0 +1,342 @@
+{
+  "info": {
+    "name": "Library Management System (Prueba Tecnica)",
+    "description": "Service A (Java/Spring Boot - books, users, auth, loan orchestration) and Service B (Go - loans). Run 'Auth > Login (Admin)' and 'Auth > Register + Login (User)' first to populate {{adminJwtToken}} and {{jwtToken}}.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "serviceAUrl", "value": "http://localhost:8080" },
+    { "key": "serviceBUrl", "value": "http://localhost:8081" },
+    { "key": "internalApiKey", "value": "change-this-internal-key" },
+    { "key": "jwtToken", "value": "" },
+    { "key": "adminJwtToken", "value": "" },
+    { "key": "bookId", "value": "" },
+    { "key": "userId", "value": "" },
+    { "key": "loanId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login (Admin, seeded on startup)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('adminJwtToken', body.accessToken);",
+                  "pm.test('login succeeded', () => pm.response.to.have.status(200));",
+                  "pm.test('role is ADMIN', () => pm.expect(body.role).to.eql('ADMIN'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"Admin123!\"\n}"
+            },
+            "url": { "raw": "{{serviceAUrl}}/api/auth/login", "host": ["{{serviceAUrl}}"], "path": ["api", "auth", "login"] }
+          }
+        },
+        {
+          "name": "Register (User)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"carol\",\n  \"email\": \"carol@example.com\",\n  \"password\": \"SuperSecret1\"\n}"
+            },
+            "url": { "raw": "{{serviceAUrl}}/api/auth/register", "host": ["{{serviceAUrl}}"], "path": ["api", "auth", "register"] }
+          }
+        },
+        {
+          "name": "Login (User)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('jwtToken', body.accessToken);",
+                  "pm.test('login succeeded', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"carol\",\n  \"password\": \"SuperSecret1\"\n}"
+            },
+            "url": { "raw": "{{serviceAUrl}}/api/auth/login", "host": ["{{serviceAUrl}}"], "path": ["api", "auth", "login"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Books (Service A)",
+      "item": [
+        {
+          "name": "List Books (public, filters + pagination)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{serviceAUrl}}/api/books?author=&genre=&available=&page=0&size=10",
+              "host": ["{{serviceAUrl}}"], "path": ["api", "books"],
+              "query": [
+                { "key": "author", "value": "" },
+                { "key": "genre", "value": "" },
+                { "key": "available", "value": "" },
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Book by Id",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{serviceAUrl}}/api/books/{{bookId}}", "host": ["{{serviceAUrl}}"], "path": ["api", "books", "{{bookId}}"] }
+          }
+        },
+        {
+          "name": "Create Book (ADMIN)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  pm.collectionVariables.set('bookId', pm.response.json().id);",
+                  "}",
+                  "pm.test('book created', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminJwtToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Clean Code\",\n  \"author\": \"Robert C. Martin\",\n  \"isbn\": \"978-0132350884\",\n  \"year\": 2008,\n  \"genre\": \"Software\",\n  \"totalCopies\": 3\n}"
+            },
+            "url": { "raw": "{{serviceAUrl}}/api/books", "host": ["{{serviceAUrl}}"], "path": ["api", "books"] }
+          }
+        },
+        {
+          "name": "Update Book (ADMIN)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminJwtToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Clean Code\",\n  \"author\": \"Robert C. Martin\",\n  \"isbn\": \"978-0132350884\",\n  \"year\": 2008,\n  \"genre\": \"Software Engineering\",\n  \"totalCopies\": 4\n}"
+            },
+            "url": { "raw": "{{serviceAUrl}}/api/books/{{bookId}}", "host": ["{{serviceAUrl}}"], "path": ["api", "books", "{{bookId}}"] }
+          }
+        },
+        {
+          "name": "Delete Book (ADMIN)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminJwtToken}}" }],
+            "url": { "raw": "{{serviceAUrl}}/api/books/{{bookId}}", "host": ["{{serviceAUrl}}"], "path": ["api", "books", "{{bookId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users (Service A)",
+      "item": [
+        {
+          "name": "List Users (ADMIN)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminJwtToken}}" }],
+            "url": { "raw": "{{serviceAUrl}}/api/users?page=0&size=10", "host": ["{{serviceAUrl}}"], "path": ["api", "users"], "query": [{ "key": "page", "value": "0" }, { "key": "size", "value": "10" }] }
+          }
+        },
+        {
+          "name": "Get User by Id (ADMIN or self)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{jwtToken}}" }],
+            "url": { "raw": "{{serviceAUrl}}/api/users/{{userId}}", "host": ["{{serviceAUrl}}"], "path": ["api", "users", "{{userId}}"] }
+          }
+        },
+        {
+          "name": "Update User (ADMIN or self)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{jwtToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"carol.updated@example.com\"\n}" },
+            "url": { "raw": "{{serviceAUrl}}/api/users/{{userId}}", "host": ["{{serviceAUrl}}"], "path": ["api", "users", "{{userId}}"] }
+          }
+        },
+        {
+          "name": "Delete User (ADMIN)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminJwtToken}}" }],
+            "url": { "raw": "{{serviceAUrl}}/api/users/{{userId}}", "host": ["{{serviceAUrl}}"], "path": ["api", "users", "{{userId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Loans (via Service A, orchestrated)",
+      "item": [
+        {
+          "name": "Create Loan",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  pm.collectionVariables.set('loanId', pm.response.json().id);",
+                  "}",
+                  "pm.test('loan created', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{jwtToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"bookId\": {{bookId}}\n}" },
+            "url": { "raw": "{{serviceAUrl}}/api/loans", "host": ["{{serviceAUrl}}"], "path": ["api", "loans"] }
+          }
+        },
+        {
+          "name": "Return Loan",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{jwtToken}}" }],
+            "url": { "raw": "{{serviceAUrl}}/api/loans/{{loanId}}/return", "host": ["{{serviceAUrl}}"], "path": ["api", "loans", "{{loanId}}", "return"] }
+          }
+        },
+        {
+          "name": "My Active Loans",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{jwtToken}}" }],
+            "url": { "raw": "{{serviceAUrl}}/api/loans/me", "host": ["{{serviceAUrl}}"], "path": ["api", "loans", "me"] }
+          }
+        },
+        {
+          "name": "My Loan History",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{jwtToken}}" }],
+            "url": { "raw": "{{serviceAUrl}}/api/loans/history", "host": ["{{serviceAUrl}}"], "path": ["api", "loans", "history"] }
+          }
+        },
+        {
+          "name": "Full History, All Users (ADMIN)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminJwtToken}}" }],
+            "url": { "raw": "{{serviceAUrl}}/api/loans/history", "host": ["{{serviceAUrl}}"], "path": ["api", "loans", "history"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Service B (direct - for grading/debugging)",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{serviceBUrl}}/health", "host": ["{{serviceBUrl}}"], "path": ["health"] }
+          }
+        },
+        {
+          "name": "Swagger UI",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{serviceBUrl}}/swagger/index.html", "host": ["{{serviceBUrl}}"], "path": ["swagger", "index.html"] }
+          }
+        },
+        {
+          "name": "Create Loan (direct, bypasses Service A orchestration)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": {{userId}},\n  \"bookId\": {{bookId}}\n}" },
+            "url": { "raw": "{{serviceBUrl}}/loans", "host": ["{{serviceBUrl}}"], "path": ["loans"] }
+          }
+        },
+        {
+          "name": "Return Loan (direct)",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{serviceBUrl}}/loans/{{loanId}}/return", "host": ["{{serviceBUrl}}"], "path": ["loans", "{{loanId}}", "return"] }
+          }
+        },
+        {
+          "name": "Active Loans by User (direct)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{serviceBUrl}}/loans/active?userId={{userId}}", "host": ["{{serviceBUrl}}"], "path": ["loans", "active"], "query": [{ "key": "userId", "value": "{{userId}}" }] }
+          }
+        },
+        {
+          "name": "Loan History (direct, all users)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{serviceBUrl}}/loans/history", "host": ["{{serviceBUrl}}"], "path": ["loans", "history"] }
+          }
+        },
+        {
+          "name": "Book Availability Check (internal endpoint on Service A, called by Service B)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Internal-Api-Key", "value": "{{internalApiKey}}" }],
+            "url": { "raw": "{{serviceAUrl}}/internal/books/{{bookId}}/availability", "host": ["{{serviceAUrl}}"], "path": ["internal", "books", "{{bookId}}", "availability"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Docs",
+      "item": [
+        {
+          "name": "Service A - Swagger UI",
+          "request": { "method": "GET", "url": { "raw": "{{serviceAUrl}}/swagger-ui.html", "host": ["{{serviceAUrl}}"], "path": ["swagger-ui.html"] } }
+        },
+        {
+          "name": "Service A - OpenAPI JSON",
+          "request": { "method": "GET", "url": { "raw": "{{serviceAUrl}}/v3/api-docs", "host": ["{{serviceAUrl}}"], "path": ["v3", "api-docs"] } }
+        },
+        {
+          "name": "Service A - Actuator Health",
+          "request": { "method": "GET", "url": { "raw": "{{serviceAUrl}}/actuator/health", "host": ["{{serviceAUrl}}"], "path": ["actuator", "health"] } }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+# --- Java / Maven (service-a-library) ---
+service-a-library/target/
+*.class
+*.jar
+!*/.mvn/wrapper/maven-wrapper.jar
+.mvn/timing.properties
+
+# --- Go (service-b-loans) ---
+service-b-loans/bin/
+service-b-loans/service-b-loans
+service-b-loans/*.exe
+service-b-loans/docs/docs.go
+service-b-loans/docs/swagger.json
+service-b-loans/docs/swagger.yaml
+
+# --- Env files (never commit secrets) ---
+.env
+**/.env
+!.env.example
+!**/.env.example
+
+# --- IDE ---
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# --- Logs ---
+*.log
+
+# --- OS ---
+Thumbs.db

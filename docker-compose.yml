@@ -1,0 +1,90 @@
+services:
+  postgres-library:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${DB_LIBRARY_USER:-library_user}
+      POSTGRES_PASSWORD: ${DB_LIBRARY_PASSWORD:-library_pass}
+      POSTGRES_DB: ${DB_LIBRARY_NAME:-library_db}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-library-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_LIBRARY_USER:-library_user} -d ${DB_LIBRARY_NAME:-library_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres-loans:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${DB_LOANS_USER:-loans_user}
+      POSTGRES_PASSWORD: ${DB_LOANS_PASSWORD:-loans_pass}
+      POSTGRES_DB: ${DB_LOANS_NAME:-loans_db}
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres-loans-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_LOANS_USER:-loans_user} -d ${DB_LOANS_NAME:-loans_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  service-b:
+    build:
+      context: ./service-b-loans
+    environment:
+      SERVER_PORT: "8081"
+      DB_HOST: postgres-loans
+      DB_PORT: "5432"
+      DB_USERNAME: ${DB_LOANS_USER:-loans_user}
+      DB_PASSWORD: ${DB_LOANS_PASSWORD:-loans_pass}
+      DB_NAME: ${DB_LOANS_NAME:-loans_db}
+      LIBRARY_SERVICE_URL: http://service-a:8080
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-change-this-internal-key}
+      LIBRARY_SERVICE_TIMEOUT_MS: "5000"
+      LOAN_PERIOD_DAYS: "14"
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres-loans:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  service-a:
+    build:
+      context: ./service-a-library
+    environment:
+      SERVER_PORT: "8080"
+      DB_URL: jdbc:postgresql://postgres-library:5432/${DB_LIBRARY_NAME:-library_db}
+      DB_USERNAME: ${DB_LIBRARY_USER:-library_user}
+      DB_PASSWORD: ${DB_LIBRARY_PASSWORD:-library_pass}
+      JWT_SECRET: ${JWT_SECRET:-change-this-super-secret-key-in-prod-please-0123456789}
+      JWT_EXPIRATION_MS: "3600000"
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-change-this-internal-key}
+      SERVICE_B_URL: http://service-b:8081
+      SERVICE_B_TIMEOUT_MS: "5000"
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@library.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin123!}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres-library:
+        condition: service_healthy
+      service-b:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres-library-data:
+  postgres-loans-data:
